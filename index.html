@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wallet Crypto</title>
+<meta name="theme-color" content="#11151c">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Tableau de bord tablette : bandeau de synthèse + onglets, colonnes de chiffres alignées */
+:root{
+  --bg:#f3f4f1; --panel:#ffffff; --line:#dfe2dc; --ink:#151a20; --muted:#646c75;
+  --accent:#b07a12; --accent-soft:#f4e8cf; --up:#1d8a55; --down:#c4383a; --warn:#a86a00;
+  --ui:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --num:"JetBrains Mono",ui-monospace,"Roboto Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1318; --panel:#171c23; --line:#262d36; --ink:#e8eaed; --muted:#8b939d;
+  --accent:#e0a83a; --accent-soft:#2c2416; --up:#3fbf7f; --down:#ef6b6b; --warn:#e3a540;
+  color-scheme:dark;}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--ui);-webkit-tap-highlight-color:transparent;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:1180px;margin:0 auto;padding-block:16px 40px;display:flex;flex-direction:column;gap:16px}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+/* barre du haut */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:18px;letter-spacing:.01em;margin-right:auto;display:flex;align-items:center;gap:8px}
+.brand i{width:10px;height:10px;border-radius:2px;background:var(--accent);display:inline-block;transform:rotate(45deg)}
+.status{font-size:13px;color:var(--muted)}
+.status b{color:var(--ink);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px;min-height:42px;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:9px 14px;min-height:42px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* bandeau de synthèse */
+.hero{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}
+.label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.total{font-family:var(--num);font-size:clamp(34px,5vw,52px);font-weight:600;letter-spacing:-.02em;line-height:1.1;margin:4px 0 10px}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.kpi{border-top:1px solid var(--line);padding-top:10px;min-width:0}
+.kpi .v{font-family:var(--num);font-size:17px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font-family:var(--num);font-size:13px}
+.up{color:var(--up)} .down{color:var(--down)}
+.chart{min-width:0;display:flex;flex-direction:column;gap:6px}
+.chart svg{width:100%;height:150px;display:block}
+.chart .leg{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+
+/* répartition */
+.split{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}
+.split span{display:block;height:100%}
+.splitleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted);margin-top:8px}
+.splitleg b{color:var(--ink);font-family:var(--num);font-weight:500}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+
+/* onglets + tableau */
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tabs button{border:0;background:none;border-radius:8px;padding:9px 16px;min-height:40px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-left:auto;min-height:40px}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;text-align:right;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-family:var(--num);font-variant-numeric:tabular-nums;font-size:14px}
+tr:last-child td{border-bottom:0}
+tbody tr.row{cursor:pointer}
+tbody tr.row:active{background:var(--accent-soft)}
+.tk{font-family:var(--ui);font-weight:700;font-size:15px}
+.sub{font-family:var(--ui);font-size:12.5px;color:var(--muted);font-weight:400;display:block;white-space:normal}
+.share{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.share i{display:block;height:6px;border-radius:3px;background:var(--accent);min-width:2px}
+.detail td{background:var(--bg);padding:8px 14px 8px 34px;font-size:13px}
+.detail td:first-child{font-family:var(--ui)}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;font-family:var(--num);margin:2px 4px 2px 0;color:var(--ink);background:var(--bg)}
+.flag{font-family:var(--ui);font-size:11px;font-weight:700;color:var(--warn);border:1px solid currentColor;border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.neg td{color:var(--down)}
+
+/* alertes */
+.alerts{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:12px;padding:12px 16px;font-size:14px}
+.alerts summary{cursor:pointer;font-weight:600}
+.alerts ul{margin:8px 0 0;padding-left:20px;color:var(--muted)}
+
+/* état vide */
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:16px;padding:32px 24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start;max-width:640px}
+.empty h1{margin:0;font-size:24px;text-wrap:balance}
+.empty p{margin:0;color:var(--muted);max-width:60ch}
+.demo{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:14px}
+.foot{font-size:12.5px;color:var(--muted)}
+.sync{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.sync h2{margin:0;font-size:18px}
+.sync p{margin:0;color:var(--muted);font-size:14px;max-width:70ch}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field input{font:14px var(--num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;width:100%}
+.field input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.state{font-size:13px;color:var(--muted)}
+.state.err{color:var(--down)}
+.warn-dot{color:var(--down);font-weight:700}
+@media (max-width:820px){.fields{grid-template-columns:minmax(0,1fr)}}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .check{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><i></i>Wallet Crypto</div>
+    <span class="status" id="status"></span>
+    <div class="seg" role="group" aria-label="Devise">
+      <button id="cur-usd" aria-pressed="true">USD</button><button id="cur-eur" aria-pressed="false">EUR</button>
+    </div>
+    <button class="btn" id="refresh" title="Actualiser"><span id="refresh-ico">↻</span> Actualiser</button>
+    <button class="btn" id="sync-open" aria-expanded="false">Synchro</button>
+    <label class="btn" for="file">Importer</label>
+    <input type="file" id="file" accept=".xlsx,.xlsm,.json,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+  </header>
+
+  <section class="sync" id="sync-panel" hidden>
+    <h2>Synchro avec maj.py</h2>
+    <p>À chaque exécution, maj.py dépose un export dans ton dépôt GitHub privé. L'appli le récupère toute seule à l'ouverture et toutes les 3 minutes. Utilise ici un jeton en <b>lecture seule</b> sur ce seul dépôt, différent de celui du PC.</p>
+    <div class="fields">
+      <label class="field"><span class="label">Dépôt privé</span><input id="sync-repo" placeholder="pseudo/wallet-data" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label class="field"><span class="label">Jeton GitHub (lecture)</span><input id="sync-token" type="password" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label class="field"><span class="label">Fichier</span><input id="sync-path" placeholder="portefeuille.json" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="sync-save">Enregistrer et synchroniser</button>
+      <button class="btn" id="sync-clear">Effacer ces réglages</button>
+      <button class="btn" id="sync-close">Fermer</button>
+      <span class="state" id="sync-state"></span>
+    </div>
+  </section>
+
+  <main id="app" style="display:flex;flex-direction:column;gap:16px"></main>
+
+  <p class="foot">Les données restent sur cette tablette (stockage local du navigateur). Rien n'est envoyé ailleurs : seule la liste des identifiants CoinGecko part vers l'API pour obtenir les prix, et la synchro ne fait que lire ton dépôt GitHub privé. Prix : CoinGecko, actualisés toutes les 3 minutes quand l'appli est ouverte.</p>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+const API = "https://api.coingecko.com/api/v3";
+const STABLES = new Set(["USDC","USDT","DAI","EURC","FDUSD","PYUSD","USDE"]);
+const LS_DATA = "wallet.data.v1", LS_PRICES = "wallet.prices.v1", LS_PREFS = "wallet.prefs.v1";
+
+const store = {
+  get(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ---------- exemple affiché tant qu'aucun classeur n'est importé ---------- */
+const DEMO = {
+  demo:true, fileName:"exemple", importedAt:null, nOps:6, invested:15000,
+  positions:[
+    {w:"Ledger",c:"BTC",q:0.12,note:"Exemple"},{w:"Kraken",c:"ETH",q:2.5,note:"Exemple"},
+    {w:"Kraken",c:"SOL",q:18,note:""},{w:"Ledger",c:"LINK",q:120,note:""},
+    {w:"Ledger",c:"USDC",q:2500,note:""},{w:"Tangem",c:"ADA",q:3000,note:""}],
+  ids:{BTC:"bitcoin",ETH:"ethereum",SOL:"solana",LINK:"chainlink",USDC:"usd-coin",ADA:"cardano"},
+  fallback:{BTC:{p:84000},ETH:{p:2700},SOL:{p:120},LINK:{p:14},USDC:{p:1},ADA:{p:0.25}},
+  warnings:[]
+};
+
+let data = store.get(LS_DATA) || DEMO;
+let live = store.get(LS_PRICES) || {at:null, eurPerUsd:null, coins:{}};
+let prefs = Object.assign({cur:"USD", tab:"cryptos", hideDust:true}, store.get(LS_PREFS) || {});
+let open = new Set(), loading = false, syncing = false;
+const LS_SYNC = "wallet.sync.v1";
+let sync = Object.assign({repo:"", token:"", path:"portefeuille.json", at:null, err:null}, store.get(LS_SYNC) || {});
+
+/* ---------- lecture du classeur (mêmes règles que maj.py) ---------- */
+function rows(wb, name){
+  const ws = wb.Sheets[name];
+  if(!ws) throw new Error(`Feuille « ${name} » introuvable dans le classeur.`);
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:true});
+}
+const isNum = v => typeof v === "number" && isFinite(v);
+const clean = v => (v === null || v === undefined || v === "") ? null : String(v).trim();
+
+function parseWorkbook(wb, fileName){
+  const warnings = [];
+  // SAISIE : ligne 5 et suivantes, arrêt à la première ligne sans Type
+  const s = rows(wb, "SAISIE");
+  const bal = new Map(), order = [];
+  let nOps = 0;
+  const add = (w,c,q) => { const k = w + "\u0001" + c; if(!bal.has(k)){ bal.set(k,0); order.push(k); } bal.set(k, bal.get(k) + q); };
+  for(let i = 4; i < s.length; i++){
+    const r = s[i] || [];
+    if(!clean(r[1])) break;
+    nOps++;
+    const L = i + 1;
+    const q = (v, col) => { if(v === null || v === "") return 0; if(isNum(v)) return v; warnings.push(`Ligne ${L} : cellule ${col}${L} en texte (${v}), comptée pour zéro`); return 0; };
+    const wo = clean(r[2]), co = clean(r[3]) && clean(r[3]).toUpperCase();
+    const wi = clean(r[5]), ci = clean(r[6]) && clean(r[6]).toUpperCase();
+    const qo = q(r[4],"E"), qi = q(r[7],"H");
+    if(wo && co) add(wo, co, -qo);
+    if(wi && ci) add(wi, ci, qi);
+    const note = String(r[10] || "").toUpperCase();
+    if(/[AÀ] (VALIDER|V[EÉ]RIFIER)/.test(note)) warnings.push(`Ligne ${L} : ${r[10]}`);
+  }
+  // Holdings : notes libres
+  const notes = {};
+  try{
+    for(const r of rows(wb, "Holdings").slice(4)){
+      if(r && r[0] && r[2] && r[3]) notes[String(r[2]).trim() + "\u0001" + String(r[0]).trim().toUpperCase()] = String(r[3]);
+    }
+  }catch(e){}
+  const positions = order.map(k => { const [w,c] = k.split("\u0001"); return {w, c, q: bal.get(k), note: notes[k] || ""}; });
+  positions.filter(p => p.q < -1e-9).forEach(p => warnings.unshift(`Solde négatif : ${p.c} @ ${p.w} = ${fmtQ(p.q)}`));
+
+  // Prix : identifiants CoinGecko + derniers prix connus (secours hors ligne)
+  const ids = {}, fallback = {};
+  const pr = rows(wb, "Prix");
+  for(let i = 4; i < pr.length; i++){
+    const r = pr[i] || [];
+    const t = clean(r[0]); if(!t) break;
+    const T = t.toUpperCase();
+    if(clean(r[1])) ids[T] = clean(r[1]);
+    if(isNum(r[2])) fallback[T] = {p:r[2], v24:isNum(r[4]) ? r[4] : null, v7:isNum(r[5]) ? r[5] : null,
+                                   t: r[3] instanceof Date ? r[3].toISOString() : null};
+  }
+  // Investissements : somme Montant EUR × Taux (montant USD)
+  let invested = 0;
+  const inv = rows(wb, "Investissements");
+  for(let i = 6; i < inv.length; i++){
+    const r = inv[i] || [];
+    if(r[0] === null || r[0] === undefined || r[0] === "") continue;
+    if(isNum(r[4])) invested += r[4] * (isNum(r[5]) && r[5] ? r[5] : 1);
+  }
+  const tickers = new Set(positions.filter(p => Math.abs(p.q) > 1e-12).map(p => p.c));
+  tickers.forEach(t => { if(!ids[t]) warnings.push(`${t} : pas d'identifiant CoinGecko dans la feuille Prix`); });
+
+  return {demo:false, fileName, importedAt:new Date().toISOString(), nOps, invested, positions, ids, fallback, warnings};
+}
+
+/* ---------- prix en direct ---------- */
+async function getJSON(url){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
+  try{
+    const r = await fetch(url, {signal:ctl.signal});
+    if(r.status === 429) throw new Error("limite CoinGecko atteinte, nouvel essai plus tard");
+    if(!r.ok) throw new Error("réponse " + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+async function refreshPrices(manual){
+  if(loading) return null;
+  const ids = [...new Set(heldTickers().map(t => data.ids[t]).filter(Boolean))];
+  if(!ids.length) return null;
+  loading = true; render();
+  let err = null;
+  try{
+    const coins = {};
+    for(let i = 0; i < ids.length; i += 150){
+      const lot = ids.slice(i, i + 150);
+      const j = await getJSON(`${API}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(lot.join(","))}&price_change_percentage=24h,7d&sparkline=true&per_page=250`);
+      for(const c of j) coins[c.id] = {p:c.current_price, v24:c.price_change_percentage_24h_in_currency, v7:c.price_change_percentage_7d_in_currency,
+                                        spark:(c.sparkline_in_7d && c.sparkline_in_7d.price) || null};
+    }
+    let eurPerUsd = live.eurPerUsd;
+    try{ const x = await getJSON(`${API}/exchange_rates`); eurPerUsd = x.rates.eur.value / x.rates.usd.value; }catch(e){}
+    live = {at:new Date().toISOString(), eurPerUsd, coins};
+    store.set(LS_PRICES, live);
+    if(manual) toast("Prix actualisés");
+  }catch(e){
+    err = e.name === "AbortError" ? "délai dépassé" : e.message === "Failed to fetch" ? "pas de connexion" : e.message;
+    if(manual) toast("Prix non actualisés : " + err + ". Derniers prix connus affichés.");
+  }finally{ loading = false; render(); }
+  return err;
+}
+
+/* ---------- synchro avec maj.py (dépôt GitHub privé) ---------- */
+function applyExport(j, via){
+  if(!j || !Array.isArray(j.positions) || typeof j.ids !== "object") throw new Error("ce n'est pas un export de maj.py");
+  data = {demo:false, via, fileName:j.fileName || "export", importedAt:j.exportedAt || new Date().toISOString(),
+          nOps:j.nOps || 0, invested:+j.invested || 0, positions:j.positions, ids:j.ids || {},
+          fallback:j.fallback || {}, warnings:j.warnings || []};
+  store.set(LS_DATA, data);
+  open.clear();
+}
+async function syncGitHub(manual){
+  if(!sync.repo || !sync.token || syncing) return {changed:false, err:null};
+  syncing = true; render();
+  let changed = false, err = null;
+  try{
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
+    let r;
+    try{
+      r = await fetch(`https://api.github.com/repos/${sync.repo}/contents/${encodeURIComponent(sync.path || "portefeuille.json")}`,
+        {cache:"no-store", signal:ctl.signal, headers:{Authorization:"Bearer " + sync.token, Accept:"application/vnd.github.raw+json"}});
+    } finally { clearTimeout(t); }
+    if(!r.ok) throw new Error({401:"jeton refusé (expiré ou mal copié)", 403:"jeton sans droit de lecture sur ce dépôt",
+      404:"dépôt ou fichier introuvable. Vérifie le nom du dépôt et lance maj.py au moins une fois"}[r.status] || "GitHub a répondu " + r.status);
+    const j = await r.json();
+    const newer = data.demo || !data.importedAt || new Date(j.exportedAt) > new Date(data.importedAt);
+    if(newer){ applyExport(j, "maj.py"); changed = true; }
+    sync.at = new Date().toISOString(); sync.err = null;
+  }catch(e){
+    err = e.name === "AbortError" ? "délai dépassé" : e.message === "Failed to fetch" ? "pas de connexion" : e.message;
+    sync.err = err;
+  }finally{
+    syncing = false; store.set(LS_SYNC, sync); render(); syncStateLine();
+  }
+  if(manual && err) toast("Synchro impossible : " + err + ". Les dernières données reçues restent affichées.");
+  return {changed, err};
+}
+async function refreshAll(manual){
+  const s = await syncGitHub(manual);
+  const perr = await refreshPrices(false);
+  if(manual && !s.err){
+    if(perr) toast("Prix non actualisés : " + perr + ". Derniers prix connus affichés.");
+    else toast(s.changed ? "Nouvelle version de maj.py reçue, prix actualisés" : (sync.repo ? "À jour · prix actualisés" : "Prix actualisés"));
+  }
+}
+
+/* ---------- calculs ---------- */
+function heldTickers(){ return [...new Set(data.positions.filter(p => Math.abs(p.q) > 1e-12).map(p => p.c))]; }
+function quote(t){
+  const id = data.ids[t], c = id && live.coins[id];
+  if(c && isNum(c.p)) return {p:c.p, v24:isNum(c.v24) ? c.v24/100 : null, v7:isNum(c.v7) ? c.v7/100 : null, spark:c.spark, live:true};
+  const f = data.fallback[t];
+  if(f) return {p:f.p, v24:f.v24, v7:f.v7, spark:null, live:false};
+  return {p:0, v24:null, v7:null, spark:null, live:false, none:true};
+}
+function compute(){
+  const pos = data.positions.filter(p => Math.abs(p.q) > 1e-12).map(p => { const q = quote(p.c); return {...p, price:q.p, value:p.q*q.p, q24:q}; });
+  const byC = new Map();
+  for(const p of pos){
+    if(!byC.has(p.c)) byC.set(p.c, {c:p.c, q:0, value:0, quote:p.q24, wallets:[]});
+    const g = byC.get(p.c); g.q += p.q; g.value += p.value; g.wallets.push(p);
+  }
+  const cryptos = [...byC.values()].sort((a,b) => b.value - a.value);
+  const byW = new Map();
+  for(const p of pos){
+    if(!byW.has(p.w)) byW.set(p.w, {w:p.w, value:0, items:[]});
+    const g = byW.get(p.w); g.value += p.value; g.items.push(p);
+  }
+  const wallets = [...byW.values()].sort((a,b) => b.value - a.value);
+  const total = pos.reduce((s,p) => s + p.value, 0);
+  let ago24 = 0, ago7 = 0;
+  for(const c of cryptos){ const q = c.quote; ago24 += q.v24 !== null ? c.value/(1+q.v24) : c.value; ago7 += q.v7 !== null ? c.value/(1+q.v7) : c.value; }
+  const stable = cryptos.filter(c => STABLES.has(c.c)).reduce((s,c) => s + c.value, 0);
+  // courbe 7 jours : quantités actuelles × historique de prix
+  const withSpark = cryptos.filter(c => c.quote.spark && c.quote.spark.length > 10);
+  let series = null;
+  if(withSpark.length){
+    const n = Math.min(...withSpark.map(c => c.quote.spark.length));
+    series = new Array(n).fill(0);
+    for(const c of cryptos){
+      const sp = c.quote.spark;
+      for(let i = 0; i < n; i++) series[i] += (sp && sp.length > 10) ? c.q * sp[sp.length - n + i] : c.value;
+    }
+    series[n-1] = total;
+  }
+  return {pos, cryptos, wallets, total, ago24, ago7, stable, series};
+}
+
+/* ---------- formats ---------- */
+const rate = () => prefs.cur === "EUR" && live.eurPerUsd ? live.eurPerUsd : 1;
+const curCode = () => prefs.cur === "EUR" && live.eurPerUsd ? "EUR" : "USD";
+function money(usd, digits){
+  const v = usd * rate(), a = Math.abs(v);
+  const d = digits !== undefined ? digits : (a >= 1000 ? 0 : 2);
+  return new Intl.NumberFormat("fr-FR", {style:"currency", currency:curCode(), minimumFractionDigits:d, maximumFractionDigits:d}).format(v);
+}
+function priceFmt(usd){
+  const v = usd * rate(), a = Math.abs(v);
+  const d = a >= 100 ? 2 : a >= 1 ? 3 : a >= 0.01 ? 5 : 8;
+  return new Intl.NumberFormat("fr-FR", {style:"currency", currency:curCode(), minimumFractionDigits:2, maximumFractionDigits:d}).format(v);
+}
+function fmtQ(q){
+  const a = Math.abs(q);
+  return new Intl.NumberFormat("fr-FR", {maximumFractionDigits: a >= 1000 ? 0 : a >= 1 ? 4 : 8}).format(q);
+}
+function pct(x, signed = true){
+  if(x === null || !isFinite(x)) return "—";
+  return (signed && x > 0 ? "+" : "") + new Intl.NumberFormat("fr-FR", {style:"percent", minimumFractionDigits:1, maximumFractionDigits:1}).format(x);
+}
+const cls = x => x === null || !isFinite(x) || Math.abs(x) < 1e-9 ? "" : x > 0 ? "up" : "down";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function when(iso){
+  if(!iso) return "jamais";
+  const d = new Date(iso), mins = Math.round((Date.now() - d) / 60000);
+  if(mins < 1) return "à l'instant";
+  if(mins < 60) return `il y a ${mins} min`;
+  return d.toLocaleString("fr-FR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+}
+
+/* ---------- rendu ---------- */
+function statusHTML(){
+  if(syncing) return "Synchro avec maj.py…";
+  if(loading) return "Actualisation des prix…";
+  let s = `Prix <b>${when(live.at)}</b>`;
+  if(!data.demo) s += ` · données ${data.via === "maj.py" ? "maj.py" : "importées"} <b>${when(data.importedAt)}</b>`;
+  if(sync.repo && sync.err) s += ` · <span class="warn-dot">synchro en échec</span>`;
+  return s;
+}
+function syncStateLine(){
+  const el = document.getElementById("sync-state");
+  if(!sync.repo){ el.textContent = "Synchro non configurée."; el.className = "state"; return; }
+  if(sync.err){ el.textContent = "Dernier essai en échec : " + sync.err; el.className = "state err"; return; }
+  el.textContent = sync.at ? `Dernière synchro réussie ${when(sync.at)}.` : "Pas encore synchronisé."; el.className = "state";
+}
+const PALETTE = ["var(--accent)","#3d7fd6","#1d9a8a","#8a63c9","#d0753d","#7a8794"];
+
+function sparkSVG(series){
+  if(!series) return `<div class="leg"><span>Courbe 7 jours disponible après actualisation des prix</span></div>`;
+  const W = 600, H = 150, pad = 6;
+  const min = Math.min(...series), max = Math.max(...series), span = (max - min) || 1;
+  const x = i => pad + i * (W - 2*pad) / (series.length - 1);
+  const y = v => pad + (H - 2*pad) * (1 - (v - min) / span);
+  const d = series.map((v,i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
+  const up = series[series.length-1] >= series[0];
+  const col = up ? "var(--up)" : "var(--down)";
+  const last = series.length - 1;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Valeur du portefeuille sur 7 jours">
+      ${[0.25,0.5,0.75].map(f => `<line x1="0" x2="${W}" y1="${pad + (H-2*pad)*f}" y2="${pad + (H-2*pad)*f}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join("")}
+      <path d="${d} L${x(last)} ${H} L${x(0)} ${H} Z" fill="${col}" opacity=".12"/>
+      <path d="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      <circle cx="${x(last)}" cy="${y(series[last])}" r="4" fill="${col}"/>
+    </svg>
+    <div class="leg num"><span>il y a 7 j</span><span>min ${money(min)} · max ${money(max)}</span><span>maintenant</span></div>`;
+}
+
+function render(){
+  const app = document.getElementById("app");
+  document.getElementById("cur-usd").setAttribute("aria-pressed", prefs.cur === "USD");
+  document.getElementById("cur-eur").setAttribute("aria-pressed", prefs.cur === "EUR");
+  document.getElementById("refresh-ico").className = (loading || syncing) ? "spin" : "";
+  document.getElementById("status").innerHTML = statusHTML();
+
+  const m = compute();
+  const pnl = m.total - data.invested;
+  const d24 = m.total - m.ago24, d7 = m.total - m.ago7;
+  const vol = m.total - m.stable;
+  const top = m.cryptos.slice(0,5), rest = m.total - top.reduce((s,c) => s + c.value, 0);
+  const dust = v => prefs.hideDust && Math.abs(v) < 1;
+
+  let h = "";
+  if(data.demo){
+    h += `<div class="empty">
+      <h1>Relie l'appli à maj.py pour voir ton portefeuille</h1>
+      <p>Touche « Synchro » et renseigne ton dépôt GitHub privé et ton jeton de lecture : l'appli se mettra à jour toute seule après chaque exécution de maj.py. En dépannage, « Importer » accepte aussi <b>portefeuille_crypto_v3.xlsx</b> ou <b>export_tablette.json</b>.</p>
+      <div class="demo">Les chiffres ci-dessous sont un exemple fictif, pas ton portefeuille.</div>
+    </div>`;
+  }
+
+  h += `<section class="hero">
+    <div style="min-width:0">
+      <div class="label">Valeur actuelle${data.demo ? " · exemple" : ""}</div>
+      <div class="total">${money(m.total)}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">24 h</div><div class="v ${cls(d24)}">${d24 >= 0 ? "+" : ""}${money(d24)}</div><div class="s ${cls(d24)}">${pct(m.ago24 ? d24/m.ago24 : null)}</div></div>
+        <div class="kpi"><div class="label">7 jours</div><div class="v ${cls(d7)}">${d7 >= 0 ? "+" : ""}${money(d7)}</div><div class="s ${cls(d7)}">${pct(m.ago7 ? d7/m.ago7 : null)}</div></div>
+        <div class="kpi"><div class="label">Plus-value</div><div class="v ${cls(pnl)}">${pnl >= 0 ? "+" : ""}${money(pnl)}</div><div class="s ${cls(pnl)}">${pct(data.invested ? pnl/data.invested : null)} sur ${money(data.invested)} investis</div></div>
+      </div>
+      <div style="margin-top:16px">
+        <div class="split" aria-hidden="true">${top.map((c,i) => `<span style="width:${(c.value/m.total*100).toFixed(2)}%;background:${PALETTE[i]}"></span>`).join("")}<span style="width:${(rest/m.total*100).toFixed(2)}%;background:${PALETTE[5]}"></span></div>
+        <div class="splitleg">${top.map((c,i) => `<span><i class="dot" style="background:${PALETTE[i]}"></i>${esc(c.c)} <b>${pct(c.value/m.total,false)}</b></span>`).join("")}<span><i class="dot" style="background:${PALETTE[5]}"></i>Autres <b>${pct(rest/m.total,false)}</b></span></div>
+        <div class="splitleg" style="margin-top:4px">Stablecoins <b>${money(m.stable)}</b> (${pct(m.total ? m.stable/m.total : null,false)}) · Volatil <b>${money(vol)}</b></div>
+      </div>
+    </div>
+    <div class="chart"><div class="label">Évolution sur 7 jours</div>${sparkSVG(m.series)}</div>
+  </section>`;
+
+  if(data.warnings && data.warnings.length){
+    h += `<details class="alerts"><summary>${data.warnings.length} point${data.warnings.length > 1 ? "s" : ""} à vérifier dans le classeur</summary><ul>${data.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></details>`;
+  }
+
+  h += `<div class="bar">
+    <div class="tabs" role="tablist">
+      ${[["cryptos",`Cryptos (${m.cryptos.length})`],["wallets",`Plateformes (${m.wallets.length})`],["positions",`Positions (${m.pos.length})`]]
+        .map(([k,l]) => `<button role="tab" data-tab="${k}" aria-selected="${prefs.tab === k}">${l}</button>`).join("")}
+    </div>
+    <label class="check"><input type="checkbox" id="dust" ${prefs.hideDust ? "checked" : ""}> Masquer les lignes &lt; 1 $</label>
+  </div>`;
+
+  h += `<div class="panel"><div class="tablewrap"><table>`;
+  if(prefs.tab === "cryptos"){
+    h += `<thead><tr><th>Crypto</th><th>Quantité</th><th>Prix</th><th>24 h</th><th>7 j</th><th>Valeur</th><th>Part</th></tr></thead><tbody>`;
+    for(const c of m.cryptos){
+      if(dust(c.value)) continue;
+      const q = c.quote, isOpen = open.has("c:" + c.c);
+      const flag = q.none ? `<span class="flag">sans prix</span>` : (!q.live && live.at ? `<span class="flag">prix ancien</span>` : "");
+      h += `<tr class="row ${c.q < -1e-9 ? "neg" : ""}" data-open="c:${esc(c.c)}" aria-expanded="${isOpen}">
+        <td><span class="tk">${isOpen ? "▾" : "▸"} ${esc(c.c)}</span>${flag}<span class="sub">${c.wallets.length} plateforme${c.wallets.length > 1 ? "s" : ""}</span></td>
+        <td>${fmtQ(c.q)}</td><td>${priceFmt(q.p)}</td>
+        <td class="${cls(q.v24)}">${pct(q.v24)}</td><td class="${cls(q.v7)}">${pct(q.v7)}</td>
+        <td><b>${money(c.value)}</b></td>
+        <td><div class="share"><i style="width:${Math.max(2, c.value/m.total*90).toFixed(1)}px"></i>${pct(m.total ? c.value/m.total : null,false)}</div></td></tr>`;
+      if(isOpen) for(const p of c.wallets.sort((a,b) => b.value - a.value)){
+        h += `<tr class="detail"><td>${esc(p.w)}${p.note ? `<span class="sub">${esc(p.note)}</span>` : ""}</td><td>${fmtQ(p.q)}</td><td></td><td></td><td></td><td>${money(p.value)}</td><td>${pct(c.value ? p.value/c.value : null,false)} de ${esc(c.c)}</td></tr>`;
+      }
+    }
+  } else if(prefs.tab === "wallets"){
+    h += `<thead><tr><th>Plateforme</th><th>Valeur</th><th>Part</th><th>Tokens</th></tr></thead><tbody>`;
+    for(const w of m.wallets){
+      if(dust(w.value)) continue;
+      const items = w.items.filter(p => !dust(p.value)).sort((a,b) => b.value - a.value);
+      h += `<tr><td><span class="tk">${esc(w.w)}</span><span class="sub">${w.items.length} position${w.items.length > 1 ? "s" : ""}</span></td>
+        <td><b>${money(w.value)}</b></td>
+        <td><div class="share"><i style="width:${Math.max(2, w.value/m.total*90).toFixed(1)}px"></i>${pct(m.total ? w.value/m.total : null,false)}</div></td>
+        <td style="text-align:left;white-space:normal;max-width:420px">${items.map(p => `<span class="chip">${esc(p.c)} ${fmtQ(p.q)}</span>`).join("")}</td></tr>`;
+    }
+  } else {
+    h += `<thead><tr><th>Crypto</th><th>Plateforme</th><th>Quantité</th><th>Prix</th><th>Valeur</th><th>Part</th></tr></thead><tbody>`;
+    for(const p of [...m.pos].sort((a,b) => b.value - a.value)){
+      if(dust(p.value) && p.q >= 0) continue;
+      h += `<tr class="${p.q < -1e-9 ? "neg" : ""}"><td><span class="tk">${esc(p.c)}</span></td>
+        <td style="text-align:right;font-family:var(--ui)">${esc(p.w)}${p.note ? `<span class="sub">${esc(p.note)}</span>` : ""}</td>
+        <td>${fmtQ(p.q)}</td><td>${priceFmt(p.price)}</td><td><b>${money(p.value)}</b></td><td>${pct(m.total ? p.value/m.total : null,false)}</td></tr>`;
+    }
+  }
+  h += `</tbody></table></div></div>`;
+  if(!data.demo) h += `<p class="foot">${data.nOps} opérations lues dans SAISIE (${esc(data.fileName)})${data.via === "maj.py" ? ", reçues de maj.py" : ""}. Les quantités changent quand maj.py tourne sur le PC ; les prix, eux, sont rafraîchis ici.</p>`;
+  app.innerHTML = h;
+}
+
+/* ---------- interactions ---------- */
+function savePrefs(){ store.set(LS_PREFS, prefs); }
+let toastT;
+function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 4000); }
+
+document.getElementById("app").addEventListener("click", e => {
+  const tab = e.target.closest("[data-tab]");
+  if(tab){ prefs.tab = tab.dataset.tab; savePrefs(); render(); return; }
+  const row = e.target.closest("[data-open]");
+  if(row){ const k = row.dataset.open; open.has(k) ? open.delete(k) : open.add(k); render(); }
+});
+document.getElementById("app").addEventListener("change", e => {
+  if(e.target.id === "dust"){ prefs.hideDust = e.target.checked; savePrefs(); render(); }
+});
+document.getElementById("cur-usd").onclick = () => { prefs.cur = "USD"; savePrefs(); render(); };
+document.getElementById("cur-eur").onclick = () => {
+  if(!live.eurPerUsd){ toast("Taux EUR indisponible tant que les prix n'ont pas été actualisés"); return; }
+  prefs.cur = "EUR"; savePrefs(); render();
+};
+document.getElementById("refresh").onclick = () => refreshAll(true);
+const panel = document.getElementById("sync-panel");
+function toggleSync(show){
+  panel.hidden = !show;
+  document.getElementById("sync-open").setAttribute("aria-expanded", show);
+  if(show){
+    document.getElementById("sync-repo").value = sync.repo;
+    document.getElementById("sync-token").value = sync.token;
+    document.getElementById("sync-path").value = sync.path || "portefeuille.json";
+    syncStateLine();
+  }
+}
+document.getElementById("sync-open").onclick = () => toggleSync(panel.hidden);
+document.getElementById("sync-close").onclick = () => toggleSync(false);
+document.getElementById("sync-save").onclick = async () => {
+  const repo = document.getElementById("sync-repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "");
+  const token = document.getElementById("sync-token").value.trim();
+  const path = document.getElementById("sync-path").value.trim() || "portefeuille.json";
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){ toast("Dépôt attendu au format pseudo/nom-du-dépôt"); return; }
+  if(!token){ toast("Colle le jeton de lecture"); return; }
+  sync = {repo, token, path, at:null, err:null};
+  store.set(LS_SYNC, sync);
+  const r = await syncGitHub(false);
+  syncStateLine();
+  if(!r.err){ toast(r.changed ? "Synchro réussie : portefeuille reçu" : "Synchro réussie"); toggleSync(false); refreshPrices(false); }
+  else toast("Synchro impossible : " + r.err);
+};
+document.getElementById("sync-clear").onclick = () => {
+  sync = {repo:"", token:"", path:"portefeuille.json", at:null, err:null};
+  store.set(LS_SYNC, sync); toggleSync(true); render(); toast("Réglages de synchro effacés de la tablette");
+};
+document.getElementById("file").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  if(typeof XLSX === "undefined" && !/\.json$/i.test(f.name)){ toast("Le lecteur Excel n'a pas pu se charger. Vérifie la connexion puis recharge la page."); return; }
+  try{
+    if(/\.json$/i.test(f.name)){
+      applyExport(JSON.parse(await f.text()), "fichier");
+      toast(`${data.nOps} opérations · ${data.positions.filter(p => Math.abs(p.q) > 1e-12).length} positions`);
+      render(); refreshPrices(false); return;
+    }
+    const wb = XLSX.read(await f.arrayBuffer(), {type:"array", cellDates:true});
+    data = parseWorkbook(wb, f.name);
+    data.via = "classeur";
+    store.set(LS_DATA, data);
+    open.clear();
+    toast(`${data.nOps} opérations lues · ${data.positions.filter(p => Math.abs(p.q) > 1e-12).length} positions`);
+    render();
+    refreshPrices(false);
+  }catch(err){ toast("Import impossible : " + err.message); }
+});
+
+render();
+if(data.demo && !sync.repo) toggleSync(true);
+refreshAll(false);
+setInterval(() => { if(document.visibilityState === "visible") refreshAll(false); }, 180000);
+setInterval(() => { document.getElementById("status").innerHTML = statusHTML(); }, 30000);
+let lastVisible = Date.now();
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible" && Date.now() - lastVisible > 60000) refreshAll(false);
+  lastVisible = Date.now();
+});
+if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
