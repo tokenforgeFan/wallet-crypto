@@ -583,6 +583,7 @@ document.getElementById("sync-save").onclick = async () => {
   if(!token){ toast("Colle le jeton de lecture"); return; }
   sync = {repo, token, path, at:null, err:null};
   store.set(LS_SYNC, sync);
+  askPersist();
   const r = await syncGitHub(false);
   syncStateLine();
   if(!r.err){ toast(r.changed ? "Synchro réussie : portefeuille reçu" : "Synchro réussie"); toggleSync(false); refreshPrices(false); }
@@ -613,7 +614,14 @@ document.getElementById("file").addEventListener("change", async e => {
   }catch(err){ toast("Import impossible : " + err.message); }
 });
 
+/* Demande au navigateur de ne pas effacer les réglages quand l'espace manque
+   ou quand un nettoyeur passe. Accordé d'office à une appli installée. */
+function askPersist(){
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); }catch(e){}
+}
+
 render();
+if(sync.repo) askPersist();
 if(data.demo && !sync.repo) toggleSync(true);
 refreshAll(false);
 setInterval(() => { if(document.visibilityState === "visible") refreshAll(false); }, 180000);
