@@ -1,6 +1,6 @@
 // Garde l'appli disponible hors connexion. Les prix CoinGecko ne sont jamais mis en cache ici :
 // l'appli affiche alors les derniers prix enregistrés sur la tablette.
-const CACHE = "wallet-v2";
+const CACHE = "wallet-v3";
 const SHELL = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png",
   "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
